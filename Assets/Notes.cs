@@ -1,5 +1,7 @@
+using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using TMPro;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -353,6 +355,10 @@ namespace Netch.GameProgrammingPatterns {
 		// - Makes it easier to implemenet multiple systems that need to update based on events
 		// -- For example a kill UI counter, achievement system, audio system
 
+		// -------------------------------
+		// -------------------------------
+		// -------------------------------
+
 		// - Delegates:
 		// -- Can be thought of as a variable that can be assigned a function as a value
 		// -- exampleDelegate = MyFunction; // subscribes function to the delegate
@@ -362,10 +368,21 @@ namespace Netch.GameProgrammingPatterns {
 		// - They can be made public or even static, which allows others classes to subscribe and unsubscribe
 
 		// - Example usage:
-		public delegate void ExampleDelegate(string optionalParam, int optionalArg2); //defines the delegate
+		public delegate void ExampleDelegate(string optionalParam, int optionalParam2); //defines the delegate
 		public ExampleDelegate exampleDelegate; //creates an instance of the delegate. this will be subscribed to and invoked
-		private void Start() {
-			exampleDelegate = MyFunction; //subscribes MyFunction to the delegate
+		private void OnEnable() {
+			// Adding a single function to the delegate
+			// Using the = operator will overwrite any existing subscribers, so using += is best practice for subscribing
+			//exampleDelegate = MyFunction; //subscribes MyFunction to the delegate
+
+			// Adding multiple functions to the delegate
+			exampleDelegate += MyFunction;
+			exampleDelegate += MyOtherFunction;
+		}
+
+		private void OnDisable() {
+			exampleDelegate -= MyFunction; //unsubscribes MyFunction from the delegate
+			exampleDelegate -= MyOtherFunction;
 		}
 
 		private void Update() {
@@ -374,6 +391,131 @@ namespace Netch.GameProgrammingPatterns {
 
 		private void MyFunction(string arg1, int arg2) {
 			Debug.Log("MyFunction was called with " + arg1 + " and " + arg2);
+		}
+
+		private void MyOtherFunction(string arg1, int arg2) {
+			// Another function that can be subscribed to the delegate
+		}
+
+		// - Example static delegate
+		// - Extremely useful for global events
+		public class StaticDelegateClass : MonoBehaviour {
+			public delegate void StaticDelegate();
+			public static StaticDelegate staticDelegate;
+
+			private void Update() {
+				staticDelegate?.Invoke();
+			}
+		}
+
+		public class StaticDelegateSubscriber : MonoBehaviour {
+			private void OnEnable() {
+				StaticDelegateClass.staticDelegate += MyFunction;
+			}
+
+			private void OnDisable() {
+				StaticDelegateClass.staticDelegate -= MyFunction;
+			}
+
+			private void MyFunction() {
+				Debug.Log("Static delegate was called");
+			}
+		}
+
+		// -------------------------------
+		// -------------------------------
+		// -------------------------------
+
+		// - Events:
+		// - Events are delegates with some extra features
+		// - Using the keyword event prevents other classes from overriding subscribed functions, and public invoking
+		// -- All that can be done publicly is subscribing and unsubscribing
+		// -- Events are a more secure way of implementing the observer pattern
+		// -- When implementing the observer pattern, events are the preferred way
+		// -- Implementation of events is similar to delegates
+
+		// -------------------------------
+		// -------------------------------
+		// -------------------------------
+
+		// - Actions and funcs:
+		// - Inherit from delegate, making them shortcuts for creating delegates
+		// -- Actions are delegates that have input parameters but do not have a return value
+		// -- Funcs are delegates that have input parameters and a return value, but funcs handle return values as an out value that is always the last input parameter
+
+		// - Actions and funcs can reduce the number of lines needed to create a delegate
+		public class StaticEventClassWithAction : MonoBehaviour {
+			// Single line of code, the use of an Action has already defined the delegate for us
+			// Using actions this way is just a shorthand for delegates
+			public static event Action myStaticEvent; // static instance
+			public static event Action<int> myStaticEventWithInt; // static instance with int parameter
+
+			private void Update() {
+				myStaticEvent?.Invoke();
+				myStaticEventWithInt?.Invoke(5);
+			}
+		}
+
+		// -------------------------------
+		// -------------------------------
+		// -------------------------------
+
+		// - Example usage:
+		// - Attach this script to the enemy prefab
+		public class EnemyDisable : MonoBehaviour {
+			public static event Action<GameObject> OnEnemyDisable; // static instance
+
+			private void OnDisable() {
+				OnEnemyDisable?.Invoke(gameObject);
+			}
+		}
+
+		public class GameManager : MonoBehaviour {
+			private void OnEnable() {
+				EnemyDisable.OnEnemyDisable += OnEnemyDisable;
+			}
+
+			private void OnDisable() {
+				EnemyDisable.OnEnemyDisable -= OnEnemyDisable;
+			}
+
+			private void OnEnemyDisable(GameObject enemy) {
+				// Do something, add points, spawn more enemies, etc.
+			}
+		}
+
+		public class UIManager : MonoBehaviour {
+			[SerializeField] private TextMeshProUGUI killCounter;
+
+			private int killCount;
+
+			private void OnEnable() {
+				EnemyDisable.OnEnemyDisable += OnEnemyDisable;
+			}
+
+			private void OnDisable() {
+				EnemyDisable.OnEnemyDisable -= OnEnemyDisable;
+			}
+
+			private void OnEnemyDisable(GameObject enemy) {
+				// Update the UI, show a kill counter, etc.
+				killCount++;
+				killCounter.SetText("Kills: " + killCount.ToString("N0"));
+			}
+		}
+
+		public class AchievementSystem : MonoBehaviour {
+			private void OnEnable() {
+				EnemyDisable.OnEnemyDisable += OnEnemyDisable;
+			}
+
+			private void OnDisable() {
+				EnemyDisable.OnEnemyDisable -= OnEnemyDisable;
+			}
+
+			private void OnEnemyDisable(GameObject enemy) {
+				// Check if the player has killed a certain amount of enemies, and give an achievement
+			}
 		}
 		#endregion
 	}
