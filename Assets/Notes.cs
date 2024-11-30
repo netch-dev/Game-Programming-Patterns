@@ -347,5 +347,34 @@ namespace Netch.GameProgrammingPatterns {
 			}
 		}
 		#endregion
+
+		#region Observer Pattern
+		// - Communicating between objects while decoupling them
+		// - Makes it easier to implemenet multiple systems that need to update based on events
+		// -- For example a kill UI counter, achievement system, audio system
+
+		// - Delegates:
+		// -- Can be thought of as a variable that can be assigned a function as a value
+		// -- exampleDelegate = MyFunction; // subscribes function to the delegate
+		// -- exampleDelegate?.Invoke(); // check if there is a subscriber, then calls the function
+
+		// - Multicast capable, meaning multiple functions can be subscribed to the same delegate
+		// - They can be made public or even static, which allows others classes to subscribe and unsubscribe
+
+		// - Example usage:
+		public delegate void ExampleDelegate(string optionalParam, int optionalArg2); //defines the delegate
+		public ExampleDelegate exampleDelegate; //creates an instance of the delegate. this will be subscribed to and invoked
+		private void Start() {
+			exampleDelegate = MyFunction; //subscribes MyFunction to the delegate
+		}
+
+		private void Update() {
+			exampleDelegate?.Invoke("Hello", 5); //invokes the delegate
+		}
+
+		private void MyFunction(string arg1, int arg2) {
+			Debug.Log("MyFunction was called with " + arg1 + " and " + arg2);
+		}
+		#endregion
 	}
 }
