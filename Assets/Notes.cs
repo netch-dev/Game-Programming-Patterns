@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 using TMPro;
 using UnityEngine;
 using UnityEngine.AI;
@@ -515,6 +514,102 @@ namespace Netch.GameProgrammingPatterns {
 
 			private void OnEnemyDisable(GameObject enemy) {
 				// Check if the player has killed a certain amount of enemies, and give an achievement
+			}
+		}
+		#endregion
+
+		#region Strategy Pattern
+		// - All about minimizing the duplication of code and decoupling classes
+		// - Can allow algos to be changed at runtime without any messy switch statements/long chains of if statements
+
+		// - For example it's useful for creating weapons that have different types
+		// - Use an interface
+		public interface IDODamage {
+			void DoDamage(int amount);
+		}
+
+		// - Don't implement this interface into all of the weapons. That would create a lot of duplicate code
+		// -- Instead we can create an instance variable of the interface in the BaseWeapon class
+		public class BaseWeapon {
+			public int damage = 0;
+			public IDODamage damageType;
+
+			public void TryDoAttack() {
+				damageType?.DoDamage(damage);
+			}
+
+			// The strategy pattern allows us to change the damage type at runtime
+			public void SetDamageType(IDODamage damageType) {
+				this.damageType = damageType;
+			}
+		}
+
+		// -- This way we can create classes that implement the IDODamage interface, each with their own damage behaviour
+		// -- Encapulating the IDODamage behaviour makes it easier to change at runtime with a simple var assignment
+		public class FireDamage : IDODamage {
+			public void DoDamage(int damage) {
+				// PlayerStats.target.health -= damage;
+				// Do fire specific logic
+			}
+		}
+
+		// -- Then we create a new class for each weapon that inherits from BaseWeapon, and sets the type of damage in the constructor
+		public class Fire_Dagger : BaseWeapon {
+			public Fire_Dagger() {
+				damage = 40;
+				damageType = new FireDamage();
+			}
+		}
+		public class Fire_Sword : BaseWeapon {
+			public Fire_Sword() {
+				damage = 60;
+				damageType = new FireDamage();
+			}
+		}
+
+		// - Easy to add new damage types, and weapons
+		public class IceDamage : IDODamage {
+			public void DoDamage(int damage) {
+				// PlayerStats.target.health -= damage;
+				// Do ice specific logic
+			}
+		}
+
+		public class Ice_Sword : BaseWeapon {
+			public Ice_Sword() {
+				damage = 50;
+				damageType = new IceDamage();
+			}
+		}
+
+		// - One downside of the strategy pattern is that it can create a lot of classes, but we have very little duplicated code
+		// -- If we have to change the FireDamage behaviour, we only have to change it in one place
+
+		// - You can go even further and create generic weapons that have their damage and damage type set by a constructor
+		// -- This allows for generic classes for each weapon type, with all of the data injected when the instance is created
+		public class Sword : BaseWeapon {
+			public Sword(int damage, IDODamage damageType) {
+				this.damage = damage;
+				this.damageType = damageType;
+			}
+		}
+
+		// - If you want to have a weapon with multiple damage types, you can create a class that holds multiple damage types
+		public class MultiDamage : IDODamage {
+			private List<IDODamage> damageTypes = new List<IDODamage>();
+
+			public void AddDamageType(IDODamage damageType) {
+				damageTypes.Add(damageType);
+			}
+
+			public void RemoveDamageType(IDODamage damageType) {
+				damageTypes.Remove(damageType);
+			}
+
+			public void DoDamage(int damage) {
+				foreach (IDODamage damageType in damageTypes) {
+					damageType.DoDamage(damage);
+				}
 			}
 		}
 		#endregion
