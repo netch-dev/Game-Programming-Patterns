@@ -5,6 +5,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.UI;
+using Random = UnityEngine.Random;
 
 namespace Netch.GameProgrammingPatterns {
 	public class Notes : MonoBehaviour {
@@ -765,129 +766,271 @@ namespace Netch.GameProgrammingPatterns {
 		}
 		#endregion
 
-		#region Generics in C#
-		// - Generics are used to write less code and make it more reusable
+		#region Factory Pattern
+		// - The factory pattern tackles the challenge of creating various objects
 
-		// - Many generic functions can operate as static functions	 so to maximize their usefulness put them in a static class
+		// - For example a power up spawner, if we only have a few powers ups it's fine but can get messy if we have too many
+		public class PowerUpSpawner : MonoBehaviour {
+			public enum PowerUpType {
+				Health,
+				Speed
+			}
 
-		// - Instead of having classes for each type of object, you can create a generic class that can be used with any type
-		// --	 of each type having its own class:
-		public class Shape : MonoBehaviour {
+			[SerializeField] private GameObject healthPrefab;
+			[SerializeField] private GameObject speedPrefab;
 
-		}
+			public void SpawnRandomPowerUp(Vector3 position) {
+				PowerUpType randomType = (PowerUpType)Random.Range(0, 2);
+				GameObject newPowerUp;
 
-		public class Cube : Shape {
+				switch (randomType) {
+					case PowerUpType.Health:
+						newPowerUp = Instantiate(healthPrefab, position, Quaternion.identity);
+						// newPowerUp.GetComponent<HealthPowerUp>().HealthAmount = Random.Range(10, 50);
+						break;
 
-		}
-
-		public class Sphere : Shape {
-
-		}
-
-		public class Capsule : Shape {
-
-		}
-
-		// - If we wanted to find all objects of each specific type we'd need 3 different functions
-		// -- This is not very efficient and can be hard to maintain
-
-		private List<Shape> allShapesInScene = new List<Shape>();
-
-		private List<Cube> GetAllCubes() {
-			List<Cube> list = new List<Cube>();
-			foreach (Shape shape in allShapesInScene) {
-				if (shape is Cube) {
-					list.Add((Cube)shape);
+					case PowerUpType.Speed:
+						newPowerUp = Instantiate(speedPrefab, position, Quaternion.identity);
+						// newPowerUp.GetComponent<SpeedPowerUp>().SpeedAmount = Random.Range(1, 5);
+						break;
 				}
 			}
-			return list;
-		}
+			// - As we add more powerups we have to make changes to the spawning class, and the switch statement will get longer and longer
+			// - This breaks the open-closed principle, which states that classes should be open for extension but closed for modification
 
-		private List<Sphere> GetAllSpheres() {
-			List<Sphere> list = new List<Sphere>();
-			foreach (Shape shape in allShapesInScene) {
-				if (shape is Sphere) {
-					list.Add((Sphere)shape);
-				}
-			}
-			return list;
-		}
+			// - The solution is to separate the creation of objects from the places where those objects are used
+			public class PowerUpFactory : MonoBehaviour {
+				[SerializeField] private GameObject healthPrefab;
+				[SerializeField] private GameObject speedPrefab;
 
-		// Etc
-
-		// - Now we have 3 functions that do almost the exact same thing
-		// -- Even worse if we want to add a fourth shape we'd need another function 
-
-		// - Since the only difference between functions is the type, a better way would be to use generics
-		// -- Use a single function that works with any type
-
-		private List<T> FindAnyTypeOfShape<T>() where T : Shape {
-			List<T> values = new List<T>();
-			foreach (Shape shape in allShapesInScene) {
-				if (shape is T) {
-					values.Add((T)shape);
-				}
-			}
-			return values;
-		}
-
-		// - The keyword where acts as a constraint, limiting the types that can be used with the function
-		// -- Above it limits the types to only those that inherit from Shape
-		// --- Without a constraint the compiler assume the type is an object, which has limits on what can be done with it
-
-		// - For example if we want to destroy objects of a given type within the scene
-		// -- Since we constrained the type to Component we can access the gameObject
-		private void DestroyObjectsOfType<T>() where T : Component {
-			T[] objectsInScene = FindObjectsOfType<T>();
-			foreach (T obj in objectsInScene) {
-				if (Application.isPlaying) {
-					Destroy(obj.gameObject);
-				} else {
-					DestroyImmediate(obj.gameObject);
-				}
-			}
-		}
-
-		// - Another use case for generics is to check for hovering over a specific object
-		// -- Rather than check for a specific component we can check for a generic type
-		private bool IsPlayerHoveringOverObject<T>() where T : Component {
-			Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-			if (Physics.Raycast(ray, out RaycastHit hit)) {
-				return hit.collider.GetComponent<T>() != null;
-			}
-			return false;
-		}
-
-		private void Update_HoverTest() {
-			bool isMouseHoveringOverCube = IsPlayerHoveringOverObject<Cube>();
-		}
-
-		// - We can go a step further and create a generic function that can be used with any type
-		// -- By introducing a second type parameter we can specify the type of the list. TClass is the parent class, TSubClass is the subclass
-		private List<TSubClass> FindTypesInList<TClass, TSubClass>(List<TClass> list) where TSubClass : TClass {
-			List<TSubClass> subclassList = new List<TSubClass>();
-
-			foreach (TClass item in list) {
-				if (item is TSubClass) {
-					subclassList.Add((TSubClass)item);
+				public GameObject CreatePowerUp(PowerUpType type) {
+					switch (type) {
+						case PowerUpType.Health:
+							return Instantiate(healthPrefab);
+						case PowerUpType.Speed:
+							return Instantiate(speedPrefab);
+						default:
+							return null;
+					}
 				}
 			}
 
-			return subclassList;
-		}
+			// - Now the spawner is 
+			// -- Open to extension: more powerups can be added without changing the spawner
+			// -- Closed for modification: the spawner doesn't need to be changed when new powerups are added
+			public class PowerUpSpawner_V2 : MonoBehaviour {
+				[SerializeField] private PowerUpFactory powerUpFactory;
 
-		// - A step even further into the function above, we can make it only useable with a list of MonoBehaviour
-		// -- To do that we need to add a second constraint
-		// where TClass : MonoBehaviour
-		private List<TSubClass> FindMonoBehaviourTypesInList<TClass, TSubClass>(List<TClass> list) where TSubClass : TClass where TClass : MonoBehaviour {
-			List<TSubClass> subclassList = new List<TSubClass>();
-			foreach (TClass item in list) {
-				if (item is TSubClass) {
-					subclassList.Add((TSubClass)item);
+				public void SpawnRandomPowerUp(Vector3 position) {
+					PowerUpType randomType = (PowerUpType)Random.Range(0, Enum.GetValues(typeof(PowerUpType)).Length);
+					GameObject newPowerUp = powerUpFactory.CreatePowerUp(randomType);
 				}
 			}
-			return subclassList;
+
+			// -------------------------------
+			// -------------------------------
+			// -------------------------------
+
+			// - We can get more modularity by using the factory method version of the factory pattern
+			// - Define an interface or abstract class that has a method for creating objects
+			public interface IPowerUpFactory {
+				GameObject CreatePowerUp();
+			}
+			public class HealthPowerUpFactory_InterfaceBased : IPowerUpFactory {
+				public GameObject CreatePowerUp() {
+					// Create health powerup
+					return null;
+				}
+			}
+			public class SpeedPowerUpFactory_InterfaceBased : IPowerUpFactory {
+				public GameObject CreatePowerUp() {
+					// Create speed powerup
+					return null;
+				}
+			}
+
+			// Or
+			public abstract class PowerUpFactoryBase {
+				public abstract GameObject CreatePowerUp();
+			}
+			public class HealthPowerUpFactory : PowerUpFactoryBase {
+				public override GameObject CreatePowerUp() {
+					// Create health powerup
+					return null;
+				}
+			}
+			public class SpeedPowerUpFactory : PowerUpFactoryBase {
+				public override GameObject CreatePowerUp() {
+					// Create speed powerup
+					return null;
+				}
+			}
+
+			// - Then the spawner script can utilize the factory method
+			public class PowerUpSpawner_V3 : MonoBehaviour {
+				[SerializeField] private List<IPowerUpFactory> powerUpFactoryList;
+
+				public void SpawnRandomPowerUp(Vector3 position) {
+					// Create any powerup without needing to know the specifics of how it was created
+					GameObject newPowerUp = powerUpFactoryList[Random.Range(0, powerUpFactoryList.Count)].CreatePowerUp();
+				}
+			}
+
+			// - It's recommended to use dictionaries to store the factories
+			public class PowerUpSpawner_V4 : MonoBehaviour {
+				[SerializeField] private List<PowerUpType> powerUpTypeKeys;
+				[SerializeField] private List<IPowerUpFactory> powerUpFactoryValues;
+
+				private Dictionary<PowerUpType, IPowerUpFactory> powerUpFactoryDictionary;
+
+				private void Start() {
+					InitializeDictionary();
+				}
+
+				private void InitializeDictionary() {
+					powerUpFactoryDictionary = new Dictionary<PowerUpType, IPowerUpFactory>();
+
+					for (int i = 0; i < powerUpTypeKeys.Count; i++) {
+						powerUpFactoryDictionary.Add(powerUpTypeKeys[i], powerUpFactoryValues[i]);
+					}
+				}
+
+				public void SpawnRandomPowerUp(Vector3 position) {
+					PowerUpType randomType = (PowerUpType)Random.Range(0, Enum.GetValues(typeof(PowerUpType)).Length);
+					GameObject newPowerUp = powerUpFactoryDictionary[randomType].CreatePowerUp();
+				}
+
+				public void SpawnPowerUpByKey(PowerUpType type, Vector3 position) {
+					if (powerUpFactoryDictionary.TryGetValue(type, out IPowerUpFactory factory)) {
+						GameObject newPowerUp = factory.CreatePowerUp();
+					}
+				}
+			}
+			#endregion
+
+			#region Generics in C#
+			// - Generics are used to write less code and make it more reusable
+
+			// - Many generic functions can operate as static functions	 so to maximize their usefulness put them in a static class
+
+			// - Instead of having classes for each type of object, you can create a generic class that can be used with any type
+			// --	 of each type having its own class:
+			public class Shape : MonoBehaviour {
+
+			}
+
+			public class Cube : Shape {
+
+			}
+
+			public class Sphere : Shape {
+
+			}
+
+			public class Capsule : Shape {
+
+			}
+
+			// - If we wanted to find all objects of each specific type we'd need 3 different functions
+			// -- This is not very efficient and can be hard to maintain
+
+			private List<Shape> allShapesInScene = new List<Shape>();
+
+			private List<Cube> GetAllCubes() {
+				List<Cube> list = new List<Cube>();
+				foreach (Shape shape in allShapesInScene) {
+					if (shape is Cube) {
+						list.Add((Cube)shape);
+					}
+				}
+				return list;
+			}
+
+			private List<Sphere> GetAllSpheres() {
+				List<Sphere> list = new List<Sphere>();
+				foreach (Shape shape in allShapesInScene) {
+					if (shape is Sphere) {
+						list.Add((Sphere)shape);
+					}
+				}
+				return list;
+			}
+
+			// Etc
+
+			// - Now we have 3 functions that do almost the exact same thing
+			// -- Even worse if we want to add a fourth shape we'd need another function 
+
+			// - Since the only difference between functions is the type, a better way would be to use generics
+			// -- Use a single function that works with any type
+
+			private List<T> FindAnyTypeOfShape<T>() where T : Shape {
+				List<T> values = new List<T>();
+				foreach (Shape shape in allShapesInScene) {
+					if (shape is T) {
+						values.Add((T)shape);
+					}
+				}
+				return values;
+			}
+
+			// - The keyword where acts as a constraint, limiting the types that can be used with the function
+			// -- Above it limits the types to only those that inherit from Shape
+			// --- Without a constraint the compiler assume the type is an object, which has limits on what can be done with it
+
+			// - For example if we want to destroy objects of a given type within the scene
+			// -- Since we constrained the type to Component we can access the gameObject
+			private void DestroyObjectsOfType<T>() where T : Component {
+				T[] objectsInScene = FindObjectsOfType<T>();
+				foreach (T obj in objectsInScene) {
+					if (Application.isPlaying) {
+						Destroy(obj.gameObject);
+					} else {
+						DestroyImmediate(obj.gameObject);
+					}
+				}
+			}
+
+			// - Another use case for generics is to check for hovering over a specific object
+			// -- Rather than check for a specific component we can check for a generic type
+			private bool IsPlayerHoveringOverObject<T>() where T : Component {
+				Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+				if (Physics.Raycast(ray, out RaycastHit hit)) {
+					return hit.collider.GetComponent<T>() != null;
+				}
+				return false;
+			}
+
+			private void Update_HoverTest() {
+				bool isMouseHoveringOverCube = IsPlayerHoveringOverObject<Cube>();
+			}
+
+			// - We can go a step further and create a generic function that can be used with any type
+			// -- By introducing a second type parameter we can specify the type of the list. TClass is the parent class, TSubClass is the subclass
+			private List<TSubClass> FindTypesInList<TClass, TSubClass>(List<TClass> list) where TSubClass : TClass {
+				List<TSubClass> subclassList = new List<TSubClass>();
+
+				foreach (TClass item in list) {
+					if (item is TSubClass) {
+						subclassList.Add((TSubClass)item);
+					}
+				}
+
+				return subclassList;
+			}
+
+			// - A step even further into the function above, we can make it only useable with a list of MonoBehaviour
+			// -- To do that we need to add a second constraint
+			// where TClass : MonoBehaviour
+			private List<TSubClass> FindMonoBehaviourTypesInList<TClass, TSubClass>(List<TClass> list) where TSubClass : TClass where TClass : MonoBehaviour {
+				List<TSubClass> subclassList = new List<TSubClass>();
+				foreach (TClass item in list) {
+					if (item is TSubClass) {
+						subclassList.Add((TSubClass)item);
+					}
+				}
+				return subclassList;
+			}
+			#endregion
 		}
-		#endregion
 	}
-}
