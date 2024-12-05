@@ -1,11 +1,13 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.AI;
+using UnityEngine.UI;
 
 namespace Netch.GameProgrammingPatterns {
-	public class Notes {
+	public class Notes : MonoBehaviour {
 		#region State Pattern
 		// "Allow an object to alter its behavior when its internal state changes. The object will appear to change its class."
 
@@ -522,7 +524,7 @@ namespace Netch.GameProgrammingPatterns {
 		// - All about minimizing the duplication of code and decoupling classes
 		// - Can allow algos to be changed at runtime without any messy switch statements/long chains of if statements
 
-		// - For example it's useful for creating weapons that have different types
+		// - For example it's useful for creating weapons that have different damage types
 		// - Use an interface
 		public interface IDODamage {
 			void DoDamage(int amount);
@@ -611,6 +613,280 @@ namespace Netch.GameProgrammingPatterns {
 					damageType.DoDamage(damage);
 				}
 			}
+		}
+		#endregion
+
+		#region Command Pattern
+		// - Sending encapsulated commands to objects. All information that is needed to execute the command is wrapped up in the command class
+		// -- This is great because the object executing this command doesn't need any external references. All it has to do is tell the command to execute
+
+		// - Useful for creating a queue of commands, undo/redo systems, that can be run right away or any time later
+		// -- For example in a turn based strategy game. All of the commands are queued up and ran when it's the player's turn
+
+		// - It may be worth it to use a pooling system for the ICommand objects, to avoid creating and destroying them all the time
+
+		public interface ICommand {
+			void Execute();
+
+			void Undo();
+		}
+
+		[System.Serializable]
+		public class MoveCommand : ICommand {
+			[SerializeField] private Vector3 direction = Vector3.zero;
+			private float distance;
+			private Transform objectToMove;
+
+			public MoveCommand(Transform objectToMove, Vector3 direction, float distance) {
+				this.objectToMove = objectToMove;
+				this.direction = direction;
+				this.distance = distance;
+			}
+
+			public void Execute() {
+				objectToMove.position += direction * distance;
+			}
+
+			public void Undo() {
+				objectToMove.position -= direction * distance;
+			}
+		}
+
+		// - Then we can use an input manager to create commands
+		public class InputManager : MonoBehaviour {
+			[SerializeField] private Button up;
+			[SerializeField] private Button down;
+			[SerializeField] private Button left;
+			[SerializeField] private Button right;
+
+			[SerializeField] private Button doTurn;
+
+			[SerializeField] private Button undo;
+
+			[SerializeField] private TurnBasedCharacter character;
+
+			[SerializeField] private UICommandList uiCommandList;
+
+			private void OnEnable() {
+				up.onClick.AddListener(() => SendMoveCommand(character.transform, Vector3.forward, 1));
+				down.onClick.AddListener(() => SendMoveCommand(character.transform, Vector3.back, 1));
+				left.onClick.AddListener(() => SendMoveCommand(character.transform, Vector3.left, 1));
+				right.onClick.AddListener(() => SendMoveCommand(character.transform, Vector3.right, 1));
+
+				doTurn.onClick.AddListener(() => character.ExecuteCommands());
+
+				undo.onClick.AddListener(() => character.UndoCommand());
+			}
+
+			private void SendMoveCommand(Transform objectToMove, Vector3 direction, float distance) {
+				MoveCommand moveCommand = new MoveCommand(objectToMove, direction, distance);
+				// Would be better to use events (Observer pattern) to send the command but this is focused on the command pattern
+				character?.AddCommand(moveCommand);
+				uiCommandList?.AddCommand(moveCommand);
+			}
+		}
+
+		public class TurnBasedCharacter : MonoBehaviour {
+			[SerializeField] private List<ICommand> commandList = new List<ICommand>();
+
+			public void AddCommand(ICommand command) {
+				commandList.Add(command);
+			}
+
+			public void UndoCommand() {
+				if (commandList.Count == 0) return;
+
+				commandList[commandList.Count - 1].Undo();
+				commandList.RemoveAt(commandList.Count - 1);
+			}
+
+			public void ExecuteCommands() {
+				StartCoroutine(ExecuteCommandsCoroutine());
+			}
+
+			private IEnumerator ExecuteCommandsCoroutine() {
+				foreach (ICommand command in commandList) {
+					command.Execute();
+					yield return new WaitForSeconds(1f);
+				}
+			}
+		}
+
+		public class UICommandList {
+			// Display the commands in the queue
+			public void AddCommand(ICommand command) {
+				// Add command to the UI
+			}
+		}
+
+		// -------------------------------
+		// -------------------------------
+		// -------------------------------
+
+		// - The code above works, but the command handling should not be in the player class
+
+		// - Extracting it to a separate class makes it easier for other objects that might need to run commands
+		public class CommandHandler {
+			private List<ICommand> commandList = new List<ICommand>();
+			private int index; // Track the index of the last command executed for the redo function
+
+			public void AddCommand(ICommand command) {
+				if (index < commandList.Count) {
+					commandList.RemoveRange(index, commandList.Count - index);
+				}
+
+				commandList.Add(command);
+				command.Execute();
+				index++;
+			}
+
+			public void UndoCommand() {
+				if (index == 0) return;
+
+				if (index > 0) {
+					commandList[index - 1].Undo();
+					index--;
+				}
+			}
+
+			public void RedoCommand() {
+				if (commandList.Count == 0) return;
+
+				if (index < commandList.Count) {
+					index++;
+					commandList[index - 1].Execute();
+				}
+			}
+		}
+
+		// Then use this class in the InputManager as the character, and re-route the buttons to the command handler
+		public class CharacterMoveClean : MonoBehaviour {
+			public CommandHandler commandHandler = new CommandHandler();
+		}
+		#endregion
+
+		#region Generics in C#
+		// - Generics are used to write less code and make it more reusable
+
+		// - Many generic functions can operate as static functions	 so to maximize their usefulness put them in a static class
+
+		// - Instead of having classes for each type of object, you can create a generic class that can be used with any type
+		// --	 of each type having its own class:
+		public class Shape : MonoBehaviour {
+
+		}
+
+		public class Cube : Shape {
+
+		}
+
+		public class Sphere : Shape {
+
+		}
+
+		public class Capsule : Shape {
+
+		}
+
+		// - If we wanted to find all objects of each specific type we'd need 3 different functions
+		// -- This is not very efficient and can be hard to maintain
+
+		private List<Shape> allShapesInScene = new List<Shape>();
+
+		private List<Cube> GetAllCubes() {
+			List<Cube> list = new List<Cube>();
+			foreach (Shape shape in allShapesInScene) {
+				if (shape is Cube) {
+					list.Add((Cube)shape);
+				}
+			}
+			return list;
+		}
+
+		private List<Sphere> GetAllSpheres() {
+			List<Sphere> list = new List<Sphere>();
+			foreach (Shape shape in allShapesInScene) {
+				if (shape is Sphere) {
+					list.Add((Sphere)shape);
+				}
+			}
+			return list;
+		}
+
+		// Etc
+
+		// - Now we have 3 functions that do almost the exact same thing
+		// -- Even worse if we want to add a fourth shape we'd need another function 
+
+		// - Since the only difference between functions is the type, a better way would be to use generics
+		// -- Use a single function that works with any type
+
+		private List<T> FindAnyTypeOfShape<T>() where T : Shape {
+			List<T> values = new List<T>();
+			foreach (Shape shape in allShapesInScene) {
+				if (shape is T) {
+					values.Add((T)shape);
+				}
+			}
+			return values;
+		}
+
+		// - The keyword where acts as a constraint, limiting the types that can be used with the function
+		// -- Above it limits the types to only those that inherit from Shape
+		// --- Without a constraint the compiler assume the type is an object, which has limits on what can be done with it
+
+		// - For example if we want to destroy objects of a given type within the scene
+		// -- Since we constrained the type to Component we can access the gameObject
+		private void DestroyObjectsOfType<T>() where T : Component {
+			T[] objectsInScene = FindObjectsOfType<T>();
+			foreach (T obj in objectsInScene) {
+				if (Application.isPlaying) {
+					Destroy(obj.gameObject);
+				} else {
+					DestroyImmediate(obj.gameObject);
+				}
+			}
+		}
+
+		// - Another use case for generics is to check for hovering over a specific object
+		// -- Rather than check for a specific component we can check for a generic type
+		private bool IsPlayerHoveringOverObject<T>() where T : Component {
+			Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+			if (Physics.Raycast(ray, out RaycastHit hit)) {
+				return hit.collider.GetComponent<T>() != null;
+			}
+			return false;
+		}
+
+		private void Update_HoverTest() {
+			bool isMouseHoveringOverCube = IsPlayerHoveringOverObject<Cube>();
+		}
+
+		// - We can go a step further and create a generic function that can be used with any type
+		// -- By introducing a second type parameter we can specify the type of the list. TClass is the parent class, TSubClass is the subclass
+		private List<TSubClass> FindTypesInList<TClass, TSubClass>(List<TClass> list) where TSubClass : TClass {
+			List<TSubClass> subclassList = new List<TSubClass>();
+
+			foreach (TClass item in list) {
+				if (item is TSubClass) {
+					subclassList.Add((TSubClass)item);
+				}
+			}
+
+			return subclassList;
+		}
+
+		// - A step even further into the function above, we can make it only useable with a list of MonoBehaviour
+		// -- To do that we need to add a second constraint
+		// where TClass : MonoBehaviour
+		private List<TSubClass> FindMonoBehaviourTypesInList<TClass, TSubClass>(List<TClass> list) where TSubClass : TClass where TClass : MonoBehaviour {
+			List<TSubClass> subclassList = new List<TSubClass>();
+			foreach (TClass item in list) {
+				if (item is TSubClass) {
+					subclassList.Add((TSubClass)item);
+				}
+			}
+			return subclassList;
 		}
 		#endregion
 	}
